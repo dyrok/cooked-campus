@@ -15,6 +15,8 @@ const leaveRoutes = require("./routes/leaveRoutes");
 const resultRoutes = require("./routes/resultRoutes");
 // the jwt checker middleware
 const authMiddleware = require("./middleware/authMiddleware");
+// api docs page data
+const { apiDocs, apiDocsPage } = require("./utils/apiDocs");
 
 // make the app, connect mongo
 const app = express();
@@ -22,6 +24,16 @@ connectDB();
 // cors so react (diff port) can call us, express.json so req.body works
 app.use(cors());
 app.use(express.json());
+
+// api docs are public -> open http://localhost:8000 in the browser
+// (has to be above authMiddleware or u'd need a token just to read the docs)
+app.get("/", (req,res)=>{
+    res.send(apiDocsPage());
+})
+// same docs as json (for postman / other tools)
+app.get("/docs.json", (req,res)=>{
+    res.json(apiDocs);
+})
 
 // login route is open, no token needed (bcoz u dont have one yet lol)
 app.use("/auth",authRoutes);
@@ -41,9 +53,11 @@ app.use("/leaves",leaveRoutes);
 app.use("/results",resultRoutes);
 
 
-// catch all, if nothing above matched just say api is running
+// catch all, if nothing above matched -> 404 route not found
 app.use('/',(req,res)=>{
-    res.send("Smart Campus API Running");
+    res.status(404).json({
+        message:"Route not found: " + req.method + " " + req.originalUrl
+    });
 })
 
 // start server on port 8000

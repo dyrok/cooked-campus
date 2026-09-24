@@ -29,6 +29,7 @@ Logins (password `password123`): `admin@campus.com`, `hod@campus.com`, `faculty@
 server.js                 mounts all routes, app.use(authMiddleware) protects everything after /auth
 config/db.js              mongoose.connect
 utils/password.js         hashPassword() / checkPassword() - salted HMAC-SHA-256
+utils/apiDocs.js          API docs page served at GET / (and /docs.json)
 middleware/
   authMiddleware.js       checks JWT, puts decoded user in req.user
   roleMiddleware.js       allowRoles("admin","hod") -> 403 for other roles
@@ -42,6 +43,8 @@ client/src/
 ```
 
 ## API
+
+Base URL: **http://localhost:8000**. Open it in the browser for the full interactive API docs (every endpoint with who can call it, query params, request body, example response and errors). The same docs as JSON: `http://localhost:8000/docs.json`. The docs data lives in `utils/apiDocs.js`.
 
 | Route | Who |
 |---|---|
