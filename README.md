@@ -29,7 +29,7 @@ Logins (password `password123`): `admin@campus.com`, `hod@campus.com`, `faculty@
 server.js                 mounts all routes, app.use(authMiddleware) protects everything after /auth
 config/db.js              mongoose.connect
 utils/password.js         hashPassword() / checkPassword() - salted HMAC-SHA-256
-utils/apiDocs.js          API docs page served at GET / (and /docs.json)
+swagger.json              OpenAPI 3 spec -> Swagger UI at /api-docs
 middleware/
   authMiddleware.js       checks JWT, puts decoded user in req.user
   roleMiddleware.js       allowRoles("admin","hod") -> 403 for other roles
@@ -44,7 +44,11 @@ client/src/
 
 ## API
 
-Base URL: **http://localhost:8000**. Open it in the browser for the full interactive API docs (every endpoint with who can call it, query params, request body, example response and errors). The same docs as JSON: `http://localhost:8000/docs.json`. The docs data lives in `utils/apiDocs.js`.
+Base URL: **http://localhost:8000**.
+
+**Swagger (API docs + testing): http://localhost:8000/api-docs** (the home page `/` redirects there). The spec lives in `swagger.json` (OpenAPI 3); the raw JSON is at `/api-docs.json` for Postman.
+
+To test protected routes in Swagger: run `POST /auth/login` with **Try it out** → copy the `token` → click **Authorize** → paste it → now **Try it out** works on every endpoint.
 
 | Route | Who |
 |---|---|
@@ -162,7 +166,7 @@ This project was built by a team of 5. Each member owned a full slice (model →
 
 | Member | Area | Backend files | Frontend files | Also did |
 |---|---|---|---|---|
-| **Member 1** – _[Neel]_ (Team lead) | Project setup, login, security, users | `server.js`, `config/db.js`, `middleware/authMiddleware.js`, `middleware/roleMiddleware.js`, `utils/password.js`, `models/User.js`, `routes/authRoutes.js`, `routes/userRoutes.js` | `main.jsx`, `App.jsx`, `Login.jsx`, `Dashboard.jsx`, `api.js`, `components/UserList.jsx`, `components/AddUser.jsx` | Folder structure, JWT + password hashing, role rules, merging everyone's code |
+| **Member 1** – _[Neel]_ (Team lead) | Project setup, login, security, users | `server.js`, `config/db.js`, `middleware/authMiddleware.js`, `middleware/roleMiddleware.js`, `utils/password.js`, `swagger.json`, `models/User.js`, `routes/authRoutes.js`, `routes/userRoutes.js` | `main.jsx`, `App.jsx`, `Login.jsx`, `Dashboard.jsx`, `api.js`, `components/UserList.jsx`, `components/AddUser.jsx` | Folder structure, JWT + password hashing, role rules, merging everyone's code |
 | **Member 2** – _[Nimish]_ | Courses & attendance marking | `models/Course.js`, `models/Attendance.js`, `routes/courseRoutes.js`, `routes/attendanceRoutes.js` (mark, day view, `/my`) | `components/Courses.jsx`, `components/MarkAttendance.jsx`, `components/MyAttendance.jsx` | Upsert logic so re-marking a day doesn't duplicate |
 | **Member 3** – _[Swanandi]_ | Attendance analytics & results | `GET /attendance/dashboard/:courseId` (aggregation + `$lookup`), `models/Result.js`, `routes/resultRoutes.js`, `seed.js` | `components/AttendanceReport.jsx`, `components/Results.jsx` | Faculty dashboard (at-risk < 75%), demo data |
 | **Member 4** – _[Akshay]_ | Assignments, notices, events | `models/Assignment.js`, `models/Notice.js`, `models/Event.js`, `routes/assignmentRoutes.js`, `routes/noticeRoutes.js`, `routes/eventRoutes.js` | `components/Assignments.jsx`, `components/Notices.jsx`, `components/Events.jsx`, `styles.css` | Search + pagination on notices, UI styling |

@@ -1,0 +1,2740 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Smart Campus API",
+    "version": "1.0.0",
+    "description": "API for the Smart Campus Management & Student Services Platform.\n\n**How to test here:**\n1. Open **Auth → POST /auth/login**, click **Try it out**, then **Execute** (demo body is filled in).\n2. Copy the `token` from the response.\n3. Click **Authorize** (top right), paste the token, click **Authorize**.\n4. Now every other endpoint's **Try it out** sends your token automatically.\n\nDemo accounts (password `password123`): `admin@campus.com`, `hod@campus.com`, `faculty@campus.com`, `aarav@campus.com`.\n\nErrors always look like `{ \"message\": \"...\" }`. 401 = no/bad token, 403 = your role isn't allowed."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000",
+      "description": "Local backend"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Auth"
+    },
+    {
+      "name": "Users"
+    },
+    {
+      "name": "Courses"
+    },
+    {
+      "name": "Attendance"
+    },
+    {
+      "name": "Assignments"
+    },
+    {
+      "name": "Results"
+    },
+    {
+      "name": "Notices"
+    },
+    {
+      "name": "Events"
+    },
+    {
+      "name": "Complaints"
+    },
+    {
+      "name": "Leaves"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Paste the token from POST /auth/login"
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "responses": {
+      "Unauthorized": {
+        "description": "No token, or token is invalid / expired",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "message": "Authorization token is required"
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "Logged in, but this role is not allowed",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "message": "Access denied for role: student"
+            }
+          }
+        }
+      },
+      "ServerError": {
+        "description": "Something broke on the server",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "message": "Something went wrong on the server"
+            }
+          }
+        }
+      }
+    }
+  },
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/auth/login": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Log in and get a JWT token",
+        "description": "Log in with email + password. Returns a JWT token (valid 1 hour) to send with every other request.\n\n**Who can call it:** public",
+        "operationId": "postAuthLogin",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "token": {
+                      "type": "string"
+                    },
+                    "user": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "email": {
+                          "type": "string"
+                        },
+                        "role": {
+                          "type": "string"
+                        },
+                        "department": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "message": "Login successful",
+                  "token": "eyJhbGciOiJIUzI1NiIs...",
+                  "user": {
+                    "id": "6ab4...",
+                    "name": "Prof. Sharma",
+                    "email": "faculty@campus.com",
+                    "role": "faculty",
+                    "department": "CSE"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "email or password missing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "message": "Email and password are required"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid email or password",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "message": "Invalid email or password"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string"
+                  },
+                  "password": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "email",
+                  "password"
+                ]
+              },
+              "example": {
+                "email": "faculty@campus.com",
+                "password": "password123"
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/users": {
+      "post": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Add a user (student, faculty, HOD, admin)",
+        "description": "Add a student, faculty, HOD or admin. The password is saved as a salted HMAC-SHA-256 hash.\n\n**Who can call it:** admin",
+        "operationId": "postUsers",
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "user": {
+                      "type": "object",
+                      "properties": {
+                        "_id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "email": {
+                          "type": "string"
+                        },
+                        "role": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "message": "User added",
+                  "user": {
+                    "_id": "6ab5...",
+                    "name": "Ishaan Verma",
+                    "email": "ishaan@campus.com",
+                    "role": "student"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "name, email, password and role are required / Email already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "message": "name, email, password and role are required"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "email": {
+                    "type": "string"
+                  },
+                  "password": {
+                    "type": "string"
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "admin",
+                      "hod",
+                      "faculty",
+                      "student"
+                    ]
+                  },
+                  "department": {
+                    "type": "string"
+                  },
+                  "semester": {
+                    "type": "integer"
+                  },
+                  "section": {
+                    "type": "string"
+                  },
+                  "rollNo": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name",
+                  "email",
+                  "password",
+                  "role"
+                ]
+              },
+              "example": {
+                "name": "Ishaan Verma",
+                "email": "ishaan@campus.com",
+                "password": "password123",
+                "role": "student",
+                "department": "CSE",
+                "semester": 4,
+                "section": "A",
+                "rollNo": "CSE109"
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "List users with search + pagination",
+        "description": "List users with search and pagination. HOD only gets their own department, faculty only gets students. Passwords are never returned.\n\n**Who can call it:** admin, hod, faculty",
+        "operationId": "getUsers",
+        "parameters": [
+          {
+            "name": "role",
+            "in": "query",
+            "required": false,
+            "description": "student (default) | faculty | hod | admin",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "admin",
+                "hod",
+                "faculty",
+                "student"
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "description": "matches name, email or roll no (case-insensitive)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "department",
+            "in": "query",
+            "required": false,
+            "description": "e.g. CSE (ignored for HOD)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "description": "page number, default 1",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "items per page, default 5",
+            "schema": {
+              "type": "integer",
+              "default": 5
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "_id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "email": {
+                            "type": "string"
+                          },
+                          "role": {
+                            "type": "string"
+                          },
+                          "department": {
+                            "type": "string"
+                          },
+                          "semester": {
+                            "type": "integer"
+                          },
+                          "rollNo": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "total": {
+                      "type": "integer"
+                    },
+                    "page": {
+                      "type": "integer"
+                    },
+                    "pages": {
+                      "type": "integer"
+                    }
+                  }
+                },
+                "example": {
+                  "data": [
+                    {
+                      "_id": "6ab4...",
+                      "name": "Aarav",
+                      "email": "aarav@campus.com",
+                      "role": "student",
+                      "department": "CSE",
+                      "semester": 4,
+                      "rollNo": "CSE101"
+                    }
+                  ],
+                  "total": 8,
+                  "page": 1,
+                  "pages": 2
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/users/{id}": {
+      "delete": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Delete a user",
+        "description": "Delete a user by id.\n\n**Who can call it:** admin",
+        "operationId": "deleteUsersId",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "MongoDB _id of the user",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "example": {
+                  "message": "User deleted"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "User not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "message": "User not found"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/courses": {
+      "post": {
+        "tags": [
+          "Courses"
+        ],
+        "summary": "Add a course",
+        "description": "Add a course and (optionally) assign a faculty. HOD's department is forced to their own.\n\n**Who can call it:** admin, hod",
+        "operationId": "postCourses",
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "_id": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "department": {
+                      "type": "string"
+                    },
+                    "semester": {
+                      "type": "integer"
+                    },
+                    "faculty": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "example": {
+                  "_id": "6ab4...",
+                  "code": "CS403",
+                  "title": "Computer Networks",
+                  "department": "CSE",
+                  "semester": 4,
+                  "faculty": "6ab4..."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "code, title, department and semester are required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "message": "code, title, department and semester are required"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "department": {
+                    "type": "string"
+                  },
+                  "semester": {
+                    "type": "integer"
+                  },
+                  "faculty": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "code",
+                  "title",
+                  "department",
+                  "semester"
+                ]
+              },
+              "example": {
+                "code": "CS403",
+                "title": "Computer Networks",
+                "department": "CSE",
+                "semester": 4,
+                "faculty": "<faculty user _id>"
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Courses"
+        ],
+        "summary": "List my courses (filtered by role)",
+        "description": "Courses for the logged-in user: faculty → courses they teach, student → their department + semester, HOD → their department, admin → all.\n\n**Who can call it:** admin, hod, faculty, student",
+        "operationId": "getCourses",
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "description": "matches course title",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "_id": {
+                        "type": "string"
+                      },
+                      "code": {
+                        "type": "string"
+                      },
+                      "title": {
+                        "type": "string"
+                      },
+                      "department": {
+                        "type": "string"
+                      },
+                      "semester": {
+                        "type": "integer"
+                      },
+                      "faculty": {
+                        "type": "object",
+                        "properties": {
+                          "_id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "example": [
+                  {
+                    "_id": "6ab4...",
+                    "code": "CS401",
+                    "title": "Database Management Systems",
+                    "department": "CSE",
+                    "semester": 4,
+                    "faculty": {
+                      "_id": "6ab4...",
+                      "name": "Prof. Sharma"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/courses/{id}/students": {
+      "get": {
+        "tags": [
+          "Courses"
+        ],
+        "summary": "Students in a course",
+        "description": "Students in a course (same department and semester as the course).\n\n**Who can call it:** admin, hod, faculty",
+        "operationId": "getCoursesIdStudents",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "MongoDB _id of the course",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "_id": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "rollNo": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "example": [
+                  {
+                    "_id": "6ab4...",
+                    "name": "Aarav",
+                    "rollNo": "CSE101"
+                  }
+                ]
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "Course not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "message": "Course not found"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/attendance/mark": {
+      "post": {
+        "tags": [
+          "Attendance"
+        ],
+        "summary": "Mark attendance for a day (upsert)",
+        "description": "Save attendance for one course on one date. Re-saving the same date updates the old records (upsert), so no duplicates. Faculty can only mark their own course.\n\n**Who can call it:** faculty, admin",
+        "operationId": "postAttendanceMark",
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "example": {
+                  "message": "Attendance saved for 8 students"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "courseId, date and records are required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "message": "courseId, date and records are required"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "This is not your course",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "message": "This is not your course"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Course not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "message": "Course not found"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "courseId": {
+                    "type": "string"
+                  },
+                  "date": {
+                    "type": "string"
+                  },
+                  "records": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "studentId": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "present",
+                            "absent"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                },
+                "required": [
+                  "courseId",
+                  "date",
+                  "records"
+                ]
+              },
+              "example": {
+                "courseId": "<course _id>",
+                "date": "2026-09-24",
+                "records": [
+                  {
+                    "studentId": "<student _id>",
+                    "status": "present"
+                  },
+                  {
+                    "studentId": "<student _id>",
+                    "status": "absent"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/attendance": {
+      "get": {
+        "tags": [
+          "Attendance"
+        ],
+        "summary": "Attendance already marked on a date",
+        "description": "Records already marked for a course on a date (used to pre-fill the marking screen).\n\n**Who can call it:** faculty, admin, hod",
+        "operationId": "getAttendance",
+        "parameters": [
+          {
+            "name": "courseId",
+            "in": "query",
+            "required": true,
+            "description": "course _id",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "date",
+            "in": "query",
+            "required": true,
+            "description": "YYYY-MM-DD",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "_id": {
+                        "type": "string"
+                      },
+                      "course": {
+                        "type": "string"
+                      },
+                      "student": {
+                        "type": "string"
+                      },
+                      "date": {
+                        "type": "string"
+                      },
+                      "status": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "example": [
+                  {
+                    "_id": "6ab4...",
+                    "course": "6ab4...",
+                    "student": "6ab4...",
+                    "date": "2026-09-24",
+                    "status": "absent"
+                  }
+                ]
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/attendance/my": {
+      "get": {
+        "tags": [
+          "Attendance"
+        ],
+        "summary": "My attendance % per course (student)",
+        "description": "The logged-in student's attendance percentage in every course.\n\n**Who can call it:** student",
+        "operationId": "getAttendanceMy",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "code": {
+                        "type": "string"
+                      },
+                      "title": {
+                        "type": "string"
+                      },
+                      "present": {
+                        "type": "integer"
+                      },
+                      "total": {
+                        "type": "integer"
+                      },
+                      "percent": {
+                        "type": "integer"
+                      }
+                    }
+                  }
+                },
+                "example": [
+                  {
+                    "code": "CS401",
+                    "title": "Database Management Systems",
+                    "present": 5,
+                    "total": 10,
+                    "percent": 50
+                  }
+                ]
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/attendance/dashboard/{courseId}": {
+      "get": {
+        "tags": [
+          "Attendance"
+        ],
+        "summary": "Faculty dashboard: % per student + at-risk list",
+        "description": "Faculty dashboard. Aggregation pipeline $match → $group → $lookup (users) → $unwind → $project → $sort gives each student's %, plus the at-risk list (below 75%) and class average.\n\n**Who can call it:** faculty, hod, admin",
+        "operationId": "getAttendanceDashboardCourseId",
+        "parameters": [
+          {
+            "name": "courseId",
+            "in": "path",
+            "required": true,
+            "description": "MongoDB _id of the course",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "students": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "_id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "rollNo": {
+                            "type": "string"
+                          },
+                          "present": {
+                            "type": "integer"
+                          },
+                          "total": {
+                            "type": "integer"
+                          },
+                          "percent": {
+                            "type": "integer"
+                          }
+                        }
+                      }
+                    },
+                    "atRisk": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "percent": {
+                            "type": "integer"
+                          }
+                        }
+                      }
+                    },
+                    "classAverage": {
+                      "type": "integer"
+                    }
+                  }
+                },
+                "example": {
+                  "students": [
+                    {
+                      "_id": "6ab4...",
+                      "name": "Kabir",
+                      "rollNo": "CSE103",
+                      "present": 5,
+                      "total": 10,
+                      "percent": 50
+                    }
+                  ],
+                  "atRisk": [
+                    {
+                      "name": "Kabir",
+                      "percent": 50
+                    },
+                    {
+                      "name": "Rohan",
+                      "percent": 70
+                    }
+                  ],
+                  "classAverage": 89
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/assignments": {
+      "post": {
+        "tags": [
+          "Assignments"
+        ],
+        "summary": "Create an assignment",
+        "description": "Create an assignment for a course.\n\n**Who can call it:** faculty",
+        "operationId": "postAssignments",
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "_id": {
+                      "type": "string"
+                    },
+                    "course": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "createdBy": {
+                      "type": "string"
+                    },
+                    "submissions": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  }
+                },
+                "example": {
+                  "_id": "6ab4...",
+                  "course": "6ab4...",
+                  "title": "ER Diagram for Library",
+                  "createdBy": "6ab4...",
+                  "submissions": []
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "course and title are required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "message": "course and title are required"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "course": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "dueDate": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "course",
+                  "title"
+                ]
+              },
+              "example": {
+                "course": "<course _id>",
+                "title": "ER Diagram for Library",
+                "description": "Draw ER diagram for a library system",
+                "dueDate": "2026-10-01"
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Assignments"
+        ],
+        "summary": "List assignments (filtered by role)",
+        "description": "Faculty → assignments they created (with submissions). Student → assignments of their courses.\n\n**Who can call it:** admin, hod, faculty, student",
+        "operationId": "getAssignments",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "_id": {
+                        "type": "string"
+                      },
+                      "title": {
+                        "type": "string"
+                      },
+                      "course": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "dueDate": {
+                        "type": "string"
+                      },
+                      "submissions": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "student": {
+                              "type": "object",
+                              "properties": {
+                                "name": {
+                                  "type": "string"
+                                },
+                                "rollNo": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            "answer": {
+                              "type": "string"
+                            },
+                            "submittedAt": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "example": [
+                  {
+                    "_id": "6ab4...",
+                    "title": "ER Diagram for Library",
+                    "course": {
+                      "code": "CS401",
+                      "title": "Database Management Systems"
+                    },
+                    "dueDate": "2026-10-01",
+                    "submissions": [
+                      {
+                        "student": {
+                          "name": "Aarav",
+                          "rollNo": "CSE101"
+                        },
+                        "answer": "https://drive.google.com/...",
+                        "submittedAt": "2026-09-24T10:00:00.000Z"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/assignments/{id}/submit": {
+      "post": {
+        "tags": [
+          "Assignments"
+        ],
+        "summary": "Submit / re-submit an answer",
+        "description": "Submit (or re-submit) an answer or link. Re-submitting replaces the old answer.\n\n**Who can call it:** student",
+        "operationId": "postAssignmentsIdSubmit",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "MongoDB _id of the assignment",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "example": {
+                  "message": "Submitted"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "answer is required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "message": "answer is required"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "Assignment not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "message": "Assignment not found"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "answer": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "answer"
+                ]
+              },
+              "example": {
+                "answer": "https://drive.google.com/my-er-diagram"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/results": {
+      "post": {
+        "tags": [
+          "Results"
+        ],
+        "summary": "Save marks for a student",
+        "description": "Save marks (0–100) for a student in a course. Saving again for the same student + course updates it.\n\n**Who can call it:** faculty, admin",
+        "operationId": "postResults",
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "_id": {
+                      "type": "string"
+                    },
+                    "student": {
+                      "type": "string"
+                    },
+                    "course": {
+                      "type": "string"
+                    },
+                    "marks": {
+                      "type": "integer"
+                    }
+                  }
+                },
+                "example": {
+                  "_id": "6ab4...",
+                  "student": "6ab4...",
+                  "course": "6ab4...",
+                  "marks": 82
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "student, course and marks are required / marks must be between 0 and 100",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "message": "student, course and marks are required"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "student": {
+                    "type": "string"
+                  },
+                  "course": {
+                    "type": "string"
+                  },
+                  "marks": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100
+                  }
+                },
+                "required": [
+                  "student",
+                  "course",
+                  "marks"
+                ]
+              },
+              "example": {
+                "student": "<student _id>",
+                "course": "<course _id>",
+                "marks": 82
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Results"
+        ],
+        "summary": "List results (student sees own only)",
+        "description": "Student → only their own results. Others → filter by course.\n\n**Who can call it:** admin, hod, faculty, student",
+        "operationId": "getResults",
+        "parameters": [
+          {
+            "name": "course",
+            "in": "query",
+            "required": false,
+            "description": "course _id (not used for students)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "_id": {
+                        "type": "string"
+                      },
+                      "student": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "rollNo": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "course": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "marks": {
+                        "type": "integer"
+                      }
+                    }
+                  }
+                },
+                "example": [
+                  {
+                    "_id": "6ab4...",
+                    "student": {
+                      "name": "Aarav",
+                      "rollNo": "CSE101"
+                    },
+                    "course": {
+                      "code": "CS401",
+                      "title": "Database Management Systems"
+                    },
+                    "marks": 82
+                  }
+                ]
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/notices": {
+      "post": {
+        "tags": [
+          "Notices"
+        ],
+        "summary": "Post a notice",
+        "description": "Post a notice to the whole college (\"ALL\") or one department.\n\n**Who can call it:** admin, hod, faculty",
+        "operationId": "postNotices",
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "_id": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "body": {
+                      "type": "string"
+                    },
+                    "department": {
+                      "type": "string"
+                    },
+                    "postedBy": {
+                      "type": "string"
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "example": {
+                  "_id": "6ab4...",
+                  "title": "Mid-sem exams from 5 Oct",
+                  "body": "Timetable will be shared soon.",
+                  "department": "ALL",
+                  "postedBy": "6ab4...",
+                  "createdAt": "2026-09-24T10:00:00.000Z"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "title and body are required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "message": "title and body are required"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "body": {
+                    "type": "string"
+                  },
+                  "department": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "title",
+                  "body"
+                ]
+              },
+              "example": {
+                "title": "Mid-sem exams from 5 Oct",
+                "body": "Timetable will be shared soon.",
+                "department": "ALL"
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Notices"
+        ],
+        "summary": "List notices with search + pagination",
+        "description": "Newest first, with search and pagination. Non-admins only see \"ALL\" + their own department.\n\n**Who can call it:** admin, hod, faculty, student",
+        "operationId": "getNotices",
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "description": "matches notice title",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "description": "default 1",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "default 5",
+            "schema": {
+              "type": "integer",
+              "default": 5
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "_id": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "department": {
+                            "type": "string"
+                          },
+                          "postedBy": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string"
+                              },
+                              "role": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "total": {
+                      "type": "integer"
+                    },
+                    "page": {
+                      "type": "integer"
+                    },
+                    "pages": {
+                      "type": "integer"
+                    }
+                  }
+                },
+                "example": {
+                  "data": [
+                    {
+                      "_id": "6ab4...",
+                      "title": "Mid-sem exams from 5 Oct",
+                      "department": "ALL",
+                      "postedBy": {
+                        "name": "Admin",
+                        "role": "admin"
+                      }
+                    }
+                  ],
+                  "total": 2,
+                  "page": 1,
+                  "pages": 1
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/notices/{id}": {
+      "delete": {
+        "tags": [
+          "Notices"
+        ],
+        "summary": "Delete a notice",
+        "description": "Delete a notice.\n\n**Who can call it:** admin, hod",
+        "operationId": "deleteNoticesId",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "MongoDB _id of the notice",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "example": {
+                  "message": "Notice deleted"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/events": {
+      "post": {
+        "tags": [
+          "Events"
+        ],
+        "summary": "Add an event",
+        "description": "Add a college event.\n\n**Who can call it:** admin, hod, faculty",
+        "operationId": "postEvents",
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "_id": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "date": {
+                      "type": "string"
+                    },
+                    "venue": {
+                      "type": "string"
+                    },
+                    "createdBy": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "example": {
+                  "_id": "6ab4...",
+                  "title": "Tech Fest 2026",
+                  "date": "2026-10-15",
+                  "venue": "Main Auditorium",
+                  "createdBy": "6ab4..."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "title and date are required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "message": "title and date are required"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "date": {
+                    "type": "string"
+                  },
+                  "venue": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "title",
+                  "date"
+                ]
+              },
+              "example": {
+                "title": "Tech Fest 2026",
+                "description": "Coding contest + hackathon",
+                "date": "2026-10-15",
+                "venue": "Main Auditorium"
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Events"
+        ],
+        "summary": "List events",
+        "description": "All events, sorted by date.\n\n**Who can call it:** admin, hod, faculty, student",
+        "operationId": "getEvents",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "_id": {
+                        "type": "string"
+                      },
+                      "title": {
+                        "type": "string"
+                      },
+                      "description": {
+                        "type": "string"
+                      },
+                      "date": {
+                        "type": "string"
+                      },
+                      "venue": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "example": [
+                  {
+                    "_id": "6ab4...",
+                    "title": "Tech Fest 2026",
+                    "description": "Coding contest + hackathon",
+                    "date": "2026-10-15",
+                    "venue": "Main Auditorium"
+                  }
+                ]
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/events/{id}": {
+      "delete": {
+        "tags": [
+          "Events"
+        ],
+        "summary": "Delete an event",
+        "description": "Delete an event.\n\n**Who can call it:** admin, hod",
+        "operationId": "deleteEventsId",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "MongoDB _id of the event",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "example": {
+                  "message": "Event deleted"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/complaints": {
+      "post": {
+        "tags": [
+          "Complaints"
+        ],
+        "summary": "Raise a complaint (student)",
+        "description": "Raise a complaint. Student id and department are taken from the token.\n\n**Who can call it:** student",
+        "operationId": "postComplaints",
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "_id": {
+                      "type": "string"
+                    },
+                    "student": {
+                      "type": "string"
+                    },
+                    "department": {
+                      "type": "string"
+                    },
+                    "subject": {
+                      "type": "string"
+                    },
+                    "text": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "example": {
+                  "_id": "6ab4...",
+                  "student": "6ab4...",
+                  "department": "CSE",
+                  "subject": "WiFi",
+                  "text": "WiFi not working in hostel block B",
+                  "status": "open"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "subject and text are required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "message": "subject and text are required"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "subject": {
+                    "type": "string"
+                  },
+                  "text": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "subject",
+                  "text"
+                ]
+              },
+              "example": {
+                "subject": "WiFi",
+                "text": "WiFi not working in hostel block B"
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Complaints"
+        ],
+        "summary": "List complaints (filtered by role)",
+        "description": "Student → own complaints, HOD → their department, admin → all. Newest first.\n\n**Who can call it:** student, hod, admin",
+        "operationId": "getComplaints",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "description": "open | in-progress | resolved",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "open",
+                "in-progress",
+                "resolved"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "_id": {
+                        "type": "string"
+                      },
+                      "student": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "rollNo": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "subject": {
+                        "type": "string"
+                      },
+                      "text": {
+                        "type": "string"
+                      },
+                      "status": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "example": [
+                  {
+                    "_id": "6ab4...",
+                    "student": {
+                      "name": "Aarav",
+                      "rollNo": "CSE101"
+                    },
+                    "subject": "WiFi",
+                    "text": "WiFi not working in hostel block B",
+                    "status": "open"
+                  }
+                ]
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/complaints/{id}": {
+      "put": {
+        "tags": [
+          "Complaints"
+        ],
+        "summary": "Change complaint status",
+        "description": "Change a complaint's status.\n\n**Who can call it:** hod, admin",
+        "operationId": "putComplaintsId",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "MongoDB _id of the complaint",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "_id": {
+                      "type": "string"
+                    },
+                    "subject": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "example": {
+                  "_id": "6ab4...",
+                  "subject": "WiFi",
+                  "status": "resolved"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "message": "Invalid status"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "Complaint not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "message": "Complaint not found"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "open",
+                      "in-progress",
+                      "resolved"
+                    ]
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              },
+              "example": {
+                "status": "resolved"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/leaves": {
+      "post": {
+        "tags": [
+          "Leaves"
+        ],
+        "summary": "Apply for leave",
+        "description": "Apply for leave.\n\n**Who can call it:** student, faculty",
+        "operationId": "postLeaves",
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "_id": {
+                      "type": "string"
+                    },
+                    "applicant": {
+                      "type": "string"
+                    },
+                    "department": {
+                      "type": "string"
+                    },
+                    "fromDate": {
+                      "type": "string"
+                    },
+                    "toDate": {
+                      "type": "string"
+                    },
+                    "reason": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "example": {
+                  "_id": "6ab4...",
+                  "applicant": "6ab4...",
+                  "department": "CSE",
+                  "fromDate": "2026-10-03",
+                  "toDate": "2026-10-04",
+                  "reason": "Attending conference",
+                  "status": "pending"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "fromDate, toDate and reason are required / fromDate cannot be after toDate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "message": "fromDate, toDate and reason are required"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "fromDate": {
+                    "type": "string"
+                  },
+                  "toDate": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "fromDate",
+                  "toDate",
+                  "reason"
+                ]
+              },
+              "example": {
+                "fromDate": "2026-10-03",
+                "toDate": "2026-10-04",
+                "reason": "Attending conference"
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Leaves"
+        ],
+        "summary": "List leave requests (filtered by role)",
+        "description": "Student/faculty → own requests, HOD → their department, admin → all.\n\n**Who can call it:** admin, hod, faculty, student",
+        "operationId": "getLeaves",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "_id": {
+                        "type": "string"
+                      },
+                      "applicant": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "role": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "fromDate": {
+                        "type": "string"
+                      },
+                      "toDate": {
+                        "type": "string"
+                      },
+                      "reason": {
+                        "type": "string"
+                      },
+                      "status": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "example": [
+                  {
+                    "_id": "6ab4...",
+                    "applicant": {
+                      "name": "Diya",
+                      "role": "student"
+                    },
+                    "fromDate": "2026-09-28",
+                    "toDate": "2026-09-29",
+                    "reason": "Family function",
+                    "status": "pending"
+                  }
+                ]
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/leaves/{id}": {
+      "put": {
+        "tags": [
+          "Leaves"
+        ],
+        "summary": "Approve or reject leave",
+        "description": "Approve or reject a leave request.\n\n**Who can call it:** hod, admin",
+        "operationId": "putLeavesId",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "MongoDB _id of the leave",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "_id": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "example": {
+                  "_id": "6ab4...",
+                  "status": "approved"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "status must be approved or rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "message": "status must be approved or rejected"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "Leave not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "message": "Leave not found"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "approved",
+                      "rejected"
+                    ]
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              },
+              "example": {
+                "status": "approved"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

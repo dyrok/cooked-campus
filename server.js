@@ -15,8 +15,9 @@ const leaveRoutes = require("./routes/leaveRoutes");
 const resultRoutes = require("./routes/resultRoutes");
 // the jwt checker middleware
 const authMiddleware = require("./middleware/authMiddleware");
-// api docs page data
-const { apiDocs, apiDocsPage } = require("./utils/apiDocs");
+// swagger ui (api docs + testing page) n our openapi spec file
+const swaggerUi = require("swagger-ui-express");
+const swaggerDocument = require("./swagger.json");
 
 // make the app, connect mongo
 const app = express();
@@ -25,14 +26,19 @@ connectDB();
 app.use(cors());
 app.use(express.json());
 
-// api docs are public -> open http://localhost:8000 in the browser
-// (has to be above authMiddleware or u'd need a token just to read the docs)
-app.get("/", (req,res)=>{
-    res.send(apiDocsPage());
+// swagger docs + testing page -> open http://localhost:8000/api-docs
+// (has to be above authMiddleware or u'd need a token just to open the docs)
+// persistAuthorization = remembers ur token even after refreshing the page
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument, {
+    swaggerOptions: { persistAuthorization: true },
+}));
+// raw openapi spec as json (can import it into postman)
+app.get("/api-docs.json", (req,res)=>{
+    res.json(swaggerDocument);
 })
-// same docs as json (for postman / other tools)
-app.get("/docs.json", (req,res)=>{
-    res.json(apiDocs);
+// home page just sends u to the swagger docs
+app.get("/", (req,res)=>{
+    res.redirect("/api-docs");
 })
 
 // login route is open, no token needed (bcoz u dont have one yet lol)
