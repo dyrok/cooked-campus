@@ -41,6 +41,18 @@ Colleges still run attendance on paper registers, notices on WhatsApp groups, an
 - **Consistent error contract**: 400 validation, 401 auth, 403 role, 404 not found, 500 server. The frontend shows the server's message directly.
 - **Simple, readable architecture**: `server.js → middleware → routes → models`, with no controller layer, so any request can be traced in a single file.
 
+### Who did what
+
+| Member | Built |
+|---|---|
+| **Neel** (Team lead) | Project setup and folder structure, login with JWT, password hashing, role middleware, user management, Swagger docs, React app shell (`App`, `Login`, `Dashboard`, `api.js`), merging everyone's code |
+| **Nimish** | Courses and attendance marking (upsert so re-marking a day doesn't duplicate), student "my attendance" view |
+| **Swanandi** | Attendance analytics dashboard (aggregation + `$lookup`, at-risk < 75%), results module, demo seed data |
+| **Akshay** | Assignments, notices and events, search + pagination on notices, UI styling |
+| **Sneha** | Complaints and leaves, API and browser testing, ERD, `USER_FLOWS.md`, project report |
+
+Full file-by-file breakdown in [Team and work division](#team-and-work-division).
+
 <!-- /TEMP -->
 
 One app for attendance, notices, assignments, events, complaints, leaves and results.
