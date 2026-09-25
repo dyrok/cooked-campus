@@ -1,5 +1,48 @@
 # Smart Campus Management & Student Services Platform
 
+<!-- TEMP: project introduction / elevator pitch — remove after presentation -->
+## Project introduction (elevator pitch)
+
+Colleges still run attendance on paper registers, notices on WhatsApp groups, and leave requests on signed forms. **Smart Campus** replaces all of that with one web app. Students, faculty, HODs and admins log in to a single dashboard and see only what their role allows. Faculty mark attendance in a few clicks and immediately see which students are below 75%. Students check their attendance, results, assignments and notices in one place. HODs approve leaves and resolve complaints without any paperwork.
+
+**In one line:** a role-based campus portal on the MERN stack with JWT auth, 9 data models, 28 REST endpoints, live attendance analytics, and Swagger docs you can test in the browser.
+
+### At a glance
+
+| | |
+|---|---|
+| **Modules** | Users, Courses, Attendance, Attendance Analytics, Assignments, Notices, Events, Complaints, Leaves, Results |
+| **Roles** | Admin, HOD, Faculty, Student, each with its own dashboard tabs and API permissions |
+| **Data models** | 9 Mongoose schemas: User, Course, Attendance, Assignment, Notice, Event, Complaint, Leave, Result |
+| **API** | 28 REST operations over 20 paths, documented in OpenAPI 3 (`swagger.json`) |
+| **Codebase** | ~2,200 lines across routes, models and React components |
+| **Team** | 5 members, each owning a full slice (model → route → React screen) |
+
+### Tech stack
+
+| Layer | Technology | Used for |
+|---|---|---|
+| Frontend | **React 18** + **Vite 5** | Single-page app, one component per module, `useState`/`useEffect` state handling |
+| HTTP client | Native `fetch` (wrapped in `client/src/api.js`) | Adds the JWT `Authorization` header, turns non-2xx responses into errors |
+| Backend | **Node.js** + **Express 5** | REST API, app-level and route-level middleware |
+| Database | **MongoDB** + **Mongoose 9** | Document storage, schema validation (`required`, `enum`, `min`/`max`), `populate()` |
+| Auth | **jsonwebtoken** (JWT, 1h expiry) | Stateless login sessions |
+| Password security | Node `crypto`: HMAC-SHA-256 + per-user random salt | Stored as `salt:hash`, no plain text passwords |
+| Authorization | Custom `allowRoles(...)` middleware | Returns 403 for roles that aren't allowed |
+| API docs | **Swagger UI** (`swagger-ui-express`) + OpenAPI 3 | Interactive docs and testing at `/api-docs` |
+| Cross-origin | `cors` | Lets the React app on :5173 call the API on :8000 |
+
+### Technical highlights
+
+- **Attendance analytics pipeline**: MongoDB aggregation (`$match → $group → $lookup → $project → $sort`) computes per-student percentages, the class average, and an at-risk list (< 75%) in a single query.
+- **Idempotent attendance marking**: `findOneAndUpdate` with `upsert`, so re-marking the same day updates records instead of duplicating them.
+- **Layered security**: every request after `/auth` passes through JWT verification, then role checks, then ownership checks (for example, faculty can only mark attendance for their own courses; an HOD only sees their own department).
+- **Search and pagination**: `$regex` search plus `skip`/`limit` paging on users, notices and courses.
+- **Consistent error contract**: 400 validation, 401 auth, 403 role, 404 not found, 500 server. The frontend shows the server's message directly.
+- **Simple, readable architecture**: `server.js → middleware → routes → models`, with no controller layer, so any request can be traced in a single file.
+
+<!-- /TEMP -->
+
 One app for attendance, notices, assignments, events, complaints, leaves and results.
 Roles: **Admin, HOD, Faculty, Student**. User flows are in [USER_FLOWS.md](USER_FLOWS.md).
 
